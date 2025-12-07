@@ -1,0 +1,313 @@
+﻿
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPTV & Radio Плеер</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f0f15;
+      color: #ffffff;
+      padding: 20px;
+      overflow-x: hidden;
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin: 20px 0;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    /* Radio Section */
+    .radio-section {
+      margin-bottom: 30px;
+    }
+
+    .radio-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .radio-item {
+      width: 100px;
+      height: 100px;
+      background: #1e1e2e;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    .radio-item:hover {
+      transform: translateY(-4px);
+      background: #2a2a3d;
+    }
+
+    .radio-item.playing {
+      background: #4f46e5;
+    }
+
+    .radio-item .icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+
+    .radio-item .name {
+      font-size: 12px;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    /* TV Grid */
+    .tv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .tv-item {
+      background: #1e1e2e;
+      border-radius: 12px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      position: relative;
+      cursor: pointer;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+      transition: transform 0.2s;
+    }
+
+    .tv-item:hover {
+      transform: scale(1.02);
+    }
+
+    .tv-item video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      background: #000;
+    }
+
+    .tv-item .title {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.7);
+      padding: 6px 10px;
+      font-size: 13px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .fullscreen-video {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .fullscreen-video video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: none;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 1001;
+    }
+
+    @media (max-width: 600px) {
+      .radio-item {
+        width: 80px;
+        height: 80px;
+      }
+
+      .radio-item .name {
+        font-size: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>📺 IPTV и 📻 Радио Плеер</h1>
+
+  <section class="radio-section">
+    <h2>Радио</h2>
+    <div class="radio-grid" id="radioGrid"></div>
+  </section>
+
+  <section class="tv-section">
+    <h2>Телеканалы</h2>
+    <div class="tv-grid" id="tvGrid"></div>
+  </section>
+
+  <div id="fullscreenContainer" class="fullscreen-video" style="display: none;">
+    <button class="close-btn" id="closeFullscreen">✕</button>
+    <video id="fullscreenVideo" controls autoplay></video>
+  </div>
+
+  <script>
+    // === RADIO STATIONS ===
+    const radioStations = [
+      { name: "Радио Рекорд", url: "https://air.radiorecord.ru:805/rr_320" },
+      { name: "Европа Плюс", url: "https://ep128.hostingradio.ru:8038/ep128" },
+      { name: "Радио ENERGY", url: "https://radios.energy.media:8443/energy.mp3" },
+      { name: "DFM", url: "https://dfm.hostingradio.ru:8040/dfm128.mp3" },
+      { name: "Новое Радио", url: "https://novoe.hostingradio.ru/novoe128.mp3" },
+      { name: "Радио Шансон", url: "https://shanson.hostingradio.ru/shanson128.mp3" },
+      { name: "Радио Маруся", url: "https://marusya.hostingradio.ru/marusya128.mp3" },
+      { name: "Comedy Radio", url: "https://comedy.hostingradio.ru/comedy128.mp3" },
+      { name: "Авторадио", url: "https://air.radiopotok.ru:8001/autoradio" },
+      { name: "Радио Русь", url: "https://rus.hostingradio.ru/rus128.mp3" }
+    ];
+
+    const radioGrid = document.getElementById('radioGrid');
+    let currentRadio = null;
+
+    radioStations.forEach(station => {
+      const el = document.createElement('div');
+      el.className = 'radio-item';
+      el.innerHTML = `
+        <div class="icon">📻</div>
+        <div class="name">${station.name}</div>
+      `;
+      el.onclick = () => {
+        if (currentRadio) {
+          currentRadio.pause();
+          document.querySelectorAll('.radio-item').forEach(i => i.classList.remove('playing'));
+        }
+        currentRadio = new Audio(station.url);
+        currentRadio.play().catch(e => console.warn("Autoplay blocked:", e));
+        el.classList.add('playing');
+      };
+      radioGrid.appendChild(el);
+    });
+
+    // === TV CHANNELS ===
+    const tvChannels = [
+      { name: "Че", url: "https://cdn4.skygo.mn/live/disk1/Che/HLSv3-FTA/Che.m3u8" },
+      { name: "Пятница интер", url: "https://cdn4.skygo.mn/live/disk1/Friday/HLSv3-FTA/Friday.m3u8" },
+      { name: "Пятница", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_PYATNIZZA/variant.m3u8" },
+      { name: "Матч ТВ", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_MATCHTV/variant.m3u8" },
+      { name: "РЕН ТВ", url: "http://zabava-htlive.cdn.ngenix.net/hls/CH_RENTV/variant.m3u8" },
+      { name: "СТС", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_STS/variant.m3u8" },
+      { name: "ТНТ", url: "http://zabava-htlive.cdn.ngenix.net/hls/CH_TNT/variant.m3u8" },
+      { name: "ТНТ4", url: "https://cdn4.skygo.mn/live/disk1/TNT4/HLSv3-FTA/TNT4.m3u8" },
+      { name: "kino-1", url: "https://kino-1.catcast.tv/content/38617/index.m3u8" },
+      { name: "Mir", url: "http://zabava-htlive.cdn.ngenix.net/hls/CH_MIR/variant.m3u8" },
+      { name: "NTV", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_NTV/variant.m3u8" },
+      { name: "Россия-1", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_RUSSIA1/variant.m3u8" },
+      { name: "ТвСд", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_1TVSD/variant.m3u8" },
+      { name: "Камин", url: "https://rt-vlg-nn-htlive.cdn.ngenix.net/hls/CH_R05_KAMINTV/variant.m3u8" },
+      { name: "TVC", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_TVC/variant.m3u8" },
+      { name: "5tv", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_5TV/variant.m3u8" },
+      { name: "Домашний", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_DOMASHNIY/variant.m3u8" },
+      { name: "культура", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_RUSSIAK/variant.m3u8" },
+      { name: "звезда", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_ZVEZDA/variant.m3u8" },
+      { name: "отр", url: "https://zabava-htlive.cdn.ngenix.net/hls/CH_OTR/variant.m3u8" },
+      { name: "звезда+", url: "https://tvzvezda.bonus-tv.ru/cdn/zvezdaplus/mono.ts.m3u8" },
+      { name: "1tvcrimes", url: "https://live1.1tvcrimea.ru/1tvcrimea.m3u8" },
+      { name: "eurosport 4k", url: "http://6f1f83d9.akadatel.com/iptv/ET85VGCD8YTWLC/31475/index.m3u8" },
+      { name: "Eurosport 1 HD", url: "http://6f1f83d9.akadatel.com/iptv/ET85VGCD8YTWLC/228/index.m3u8" },
+      { name: "Eurosport 2 HD", url: "http://6f1f83d9.akadatel.com/iptv/ET85VGCD8YTWLC/234/index.m3u8" },
+      { name: "Моя Планета", url: "http://194.143.148.28:8080/Nauka20/mpegts" }
+    ];
+
+    // Fill up to 40 channels
+    while (tvChannels.length < 40) {
+      tvChannels.push({ name: `Канал ${tvChannels.length + 1}`, url: "" });
+    }
+
+    const tvGrid = document.getElementById('tvGrid');
+    const fullscreenContainer = document.getElementById('fullscreenContainer');
+    const fullscreenVideo = document.getElementById('fullscreenVideo');
+    const closeBtn = document.getElementById('closeFullscreen');
+
+    tvChannels.forEach(channel => {
+      const el = document.createElement('div');
+      el.className = 'tv-item';
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.disablePictureInPicture = true;
+      video.controls = false;
+
+      if (channel.url) {
+        video.src = channel.url;
+        video.load();
+        video.play().catch(e => {
+          console.warn(`Failed to autoplay ${channel.name}:`, e);
+        });
+      }
+
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = channel.name;
+
+      el.appendChild(video);
+      el.appendChild(title);
+
+      el.onclick = () => {
+        if (!channel.url) return;
+        fullscreenVideo.src = channel.url;
+        fullscreenVideo.muted = false;
+        fullscreenVideo.play();
+        fullscreenContainer.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+      };
+
+      tvGrid.appendChild(el);
+    });
+
+    closeBtn.onclick = () => {
+      fullscreenVideo.pause();
+      fullscreenVideo.src = '';
+      fullscreenContainer.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    };
+
+    // Close on ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && fullscreenContainer.style.display === 'flex') {
+        closeBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>
+```
